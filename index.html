@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador de energía eólica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B1417;
+    --panel:#101F22;
+    --panel-2:#0D1B1D;
+    --border:#1C3235;
+    --text:#E7EEEC;
+    --text-dim:#7E9694;
+    --wind:#69C9C6;
+    --power:#E3A64E;
+    --warn:#E2B33D;
+    --danger:#E2664B;
+    --ok:#6FE7A7;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Mono', monospace;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    padding:28px 20px 60px;
+  }
+  h1,h2{ font-family:'Space Grotesk', sans-serif; }
+  .wrap{ max-width:980px; margin:0 auto; }
+
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:12px;
+    border-bottom:1px solid var(--border);
+    padding-bottom:16px;
+    margin-bottom:22px;
+  }
+  header h1{ font-size:22px; font-weight:600; margin:0; letter-spacing:-0.01em; }
+  header p{ margin:4px 0 0; color:var(--text-dim); font-size:13px; }
+  .status{
+    text-align:right;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:15px;
+    font-weight:600;
+  }
+  .status span{
+    display:block;
+    color:var(--text-dim);
+    font-size:11px;
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:400;
+  }
+
+  .transport{ display:flex; gap:10px; align-items:center; margin-bottom:18px; }
+  button{
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--text);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    padding:8px 14px;
+    border-radius:3px;
+    cursor:pointer;
+  }
+  button:hover{ border-color:var(--text-dim); }
+  button.active{ border-color:var(--wind); color:var(--wind); }
+  button:focus-visible{ outline:2px solid var(--wind); outline-offset:2px; }
+  .speed-group{ display:flex; gap:6px; margin-left:auto; color:var(--text-dim); align-items:center; font-size:12px; }
+
+  .layout{
+    display:grid;
+    grid-template-columns:1.3fr 1fr;
+    gap:24px;
+    align-items:start;
+  }
+  @media (max-width:760px){ .layout{ grid-template-columns:1fr; } }
+
+  svg.diagram{ width:100%; height:auto; display:block; }
+  .node-box{ fill:var(--panel); stroke:var(--border); stroke-width:1.4; }
+  .node-label{ font-family:'Space Grotesk',sans-serif; fill:var(--text); font-size:13px; font-weight:600; }
+  .node-value{ font-family:'IBM Plex Mono',monospace; font-size:13px; }
+  .flow-line{ fill:none; stroke-width:2; }
+
+  .curve-box{
+    border:1px solid var(--border);
+    border-radius:3px;
+    background:var(--panel-2);
+    padding:14px 14px 6px;
+  }
+  .curve-box h2{ font-size:13px; font-weight:600; margin:0 0 8px; }
+  canvas{ width:100%; display:block; }
+
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    border-top:1px solid var(--border);
+    border-bottom:1px solid var(--border);
+    margin:22px 0 26px;
+  }
+  .stat{ padding:14px 16px; border-right:1px solid var(--border); }
+  .stat:last-child{ border-right:none; }
+  .stat .label{ color:var(--text-dim); font-size:11.5px; margin-bottom:6px; }
+  .stat .value{ font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .stat .unit{ font-size:12.5px; color:var(--text-dim); font-weight:400; margin-left:3px; }
+  @media (max-width:640px){ .stats{ grid-template-columns:repeat(2,1fr); } }
+
+  .chart-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+  .chart-head h2{ font-size:14px; font-weight:600; margin:0; }
+  .legend{ display:flex; gap:14px; font-size:11.5px; color:var(--text-dim); }
+  .legend .dot{ display:inline-block; width:8px;height:8px; border-radius:50%; margin-right:5px; position:relative; top:-1px; }
+  canvas#chart{
+    width:100%; height:200px; display:block;
+    border:1px solid var(--border); border-radius:3px; background:var(--panel-2);
+  }
+
+  .controls{ margin-top:30px; }
+  .controls h2{ font-size:14px; font-weight:600; margin:0 0 14px; border-bottom:1px solid var(--border); padding-bottom:10px; }
+  .sliders{ display:grid; grid-template-columns:repeat(2,1fr); gap:20px 32px; }
+  .slider-row label{ display:flex; justify-content:space-between; font-size:12.5px; color:var(--text-dim); margin-bottom:6px; }
+  .slider-row label b{ color:var(--text); font-weight:500; }
+  input[type=range]{ -webkit-appearance:none; width:100%; height:2px; background:var(--border); border-radius:2px; outline:none; }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:14px;height:14px; border-radius:50%; background:var(--text); cursor:pointer; margin-top:-6px; }
+  input[type=range]::-moz-range-thumb{ width:14px;height:14px; border:none; border-radius:50%; background:var(--text); cursor:pointer; }
+  input[type=range]::-moz-range-track{ height:2px; background:var(--border); }
+  @media (prefers-reduced-motion: reduce){ * { animation-duration: 0.001ms !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Simulador de energía eólica</h1>
+      <p>Curva de potencia real de una turbina frente al viento cambiante</p>
+    </div>
+    <div class="status" id="statusBox">Generando<span>estado de la turbina</span></div>
+  </header>
+
+  <div class="transport">
+    <button id="playBtn">Pausar</button>
+    <button id="resetBtn">Reiniciar</button>
+    <div class="speed-group">
+      Velocidad de simulación
+      <button data-speed="1" id="s1">Lenta</button>
+      <button data-speed="3" class="active" id="s2">Normal</button>
+      <button data-speed="8" id="s3">Rápida</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <svg class="diagram" viewBox="0 0 460 320" xmlns="http://www.w3.org/2000/svg" aria-label="Turbina eólica y flujo de viento">
+      <g id="windLines" stroke="var(--wind)" stroke-width="1.4" stroke-dasharray="10 8" opacity="0.6">
+        <line x1="10" y1="90" x2="150" y2="90"/>
+        <line x1="10" y1="120" x2="150" y2="120"/>
+        <line x1="10" y1="150" x2="150" y2="150"/>
+      </g>
+
+      <line x1="230" y1="80" x2="230" y2="260" stroke="var(--border)" stroke-width="8"/>
+      <g id="blades" transform="translate(230,80)">
+        <line x1="0" y1="0" x2="0" y2="-58" stroke="var(--wind)" stroke-width="6" stroke-linecap="round"/>
+        <line x1="0" y1="0" x2="50" y2="29" stroke="var(--wind)" stroke-width="6" stroke-linecap="round"/>
+        <line x1="0" y1="0" x2="-50" y2="29" stroke="var(--wind)" stroke-width="6" stroke-linecap="round"/>
+      </g>
+      <circle cx="230" cy="80" r="8" fill="var(--panel)" stroke="var(--border)" stroke-width="1.4"/>
+
+      <path id="lineOut" class="flow-line" d="M238,120 C300,120 300,120 360,120" stroke="var(--power)" stroke-dasharray="6 6"/>
+      <rect x="355" y="96" width="95" height="48" rx="4" class="node-box"/>
+      <text x="367" y="115" class="node-label">Salida</text>
+      <text x="367" y="133" class="node-value" fill="var(--power)" id="txtPowerNode">0.0 kW</text>
+
+      <rect x="20" y="260" width="150" height="48" rx="4" class="node-box"/>
+      <text x="32" y="279" class="node-label">Viento</text>
+      <text x="32" y="297" class="node-value" fill="var(--wind)" id="txtWindNode">0.0 m/s</text>
+
+      <rect x="200" y="260" width="150" height="48" rx="4" class="node-box"/>
+      <text x="212" y="279" class="node-label">Rotor</text>
+      <text x="212" y="297" class="node-value" fill="var(--text-dim)" id="txtRpmNode">0 rpm</text>
+    </svg>
+
+    <div class="curve-box">
+      <h2>Curva de potencia (según diámetro actual)</h2>
+      <canvas id="curveChart" width="380" height="230"></canvas>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="label">Viento actual</div>
+      <div class="value" id="statWind">0.0<span class="unit">m/s</span></div>
+    </div>
+    <div class="stat">
+      <div class="label">Potencia generada</div>
+      <div class="value" id="statPower">0.0<span class="unit">kW</span></div>
+    </div>
+    <div class="stat">
+      <div class="label">Potencia nominal</div>
+      <div class="value" id="statRated">0.0<span class="unit">kW</span></div>
+    </div>
+    <div class="stat">
+      <div class="label">Energía acumulada</div>
+      <div class="value" id="statEnergy">0.0<span class="unit">kWh</span></div>
+    </div>
+  </div>
+
+  <div class="chart-head">
+    <h2>Viento y potencia en el tiempo</h2>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--wind)"></span>Viento (m/s)</span>
+      <span><span class="dot" style="background:var(--power)"></span>Potencia (kW)</span>
+    </div>
+  </div>
+  <canvas id="chart" width="900" height="200"></canvas>
+
+  <div class="controls">
+    <h2>Condiciones</h2>
+    <div class="sliders">
+      <div class="slider-row">
+        <label>Viento medio <b id="valMean">9 m/s</b></label>
+        <input type="range" id="meanSlider" min="0" max="28" value="9" step="0.5">
+      </div>
+      <div class="slider-row">
+        <label>Turbulencia / ráfagas <b id="valTurb">40%</b></label>
+        <input type="range" id="turbSlider" min="0" max="100" value="40">
+      </div>
+      <div class="slider-row">
+        <label>Diámetro del rotor <b id="valDiam">4.0 m</b></label>
+        <input type="range" id="diamSlider" min="2" max="8" value="4" step="0.2">
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const RHO = 1.225, CP = 0.4, CUT_IN = 3, RATED_V = 12, CUT_OUT = 25;
+
+  const state = {
+    running:true, timeScale:3, t:0,
+    mean:9, turb:40, diameter:4,
+    energy:0, history:[]
+  };
+
+  const el = id => document.getElementById(id);
+  const getVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  function ratedPower(diameter){
+    const A = Math.PI*(diameter/2)**2;
+    return 0.5*RHO*A*CP*(RATED_V**3)/1000; // kW
+  }
+  function powerAt(v, diameter){
+    if(v < CUT_IN || v >= CUT_OUT) return 0;
+    const A = Math.PI*(diameter/2)**2;
+    const vEff = Math.min(v, RATED_V);
+    return 0.5*RHO*A*CP*(vEff**3)/1000; // kW
+  }
+  function windAt(t, mean, turbPct){
+    const amp = (turbPct/100) * mean * 0.6;
+    const raw = mean + amp*(Math.sin(t*0.35) + 0.5*Math.sin(t*0.83+1.1) + 0.3*Math.sin(t*1.7+2.3));
+    return Math.max(0, raw);
+  }
+
+  const meanSlider = el('meanSlider'), turbSlider = el('turbSlider'), diamSlider = el('diamSlider');
+  const valMean = el('valMean'), valTurb = el('valTurb'), valDiam = el('valDiam');
+  meanSlider.addEventListener('input', e => { state.mean = +e.target.value; valMean.textContent = state.mean+' m/s'; });
+  turbSlider.addEventListener('input', e => { state.turb = +e.target.value; valTurb.textContent = state.turb+'%'; });
+  diamSlider.addEventListener('input', e => { state.diameter = +e.target.value; valDiam.textContent = state.diameter.toFixed(1)+' m'; });
+
+  const playBtn = el('playBtn'), resetBtn = el('resetBtn');
+  playBtn.addEventListener('click', () => {
+    state.running = !state.running;
+    playBtn.textContent = state.running ? 'Pausar' : 'Reanudar';
+  });
+  resetBtn.addEventListener('click', () => { state.t = 0; state.energy = 0; state.history = []; });
+
+  const speedBtns = [el('s1'), el('s2'), el('s3')];
+  speedBtns.forEach(btn => btn.addEventListener('click', () => {
+    state.timeScale = +btn.dataset.speed;
+    speedBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }));
+
+  const windLines = document.querySelectorAll('#windLines line');
+  const blades = el('blades');
+  const lineOut = el('lineOut');
+  const statusBox = el('statusBox');
+  const txtWindNode = el('txtWindNode'), txtRpmNode = el('txtRpmNode'), txtPowerNode = el('txtPowerNode');
+  const statWind = el('statWind'), statPower = el('statPower'), statRated = el('statRated'), statEnergy = el('statEnergy');
+
+  let bladeAngle = 0, windOffset = 0;
+  lineOut._offset = 0;
+
+  const curveCanvas = el('curveChart'), curveCtx = curveCanvas.getContext('2d');
+  function drawCurve(currentV, currentP){
+    const w = curveCanvas.width, h = curveCanvas.height;
+    curveCtx.clearRect(0,0,w,h);
+    const padL = 34, padR = 8, padT = 8, padB = 24;
+    const plotW = w-padL-padR, plotH = h-padT-padB;
+    const maxV = 28, maxP = Math.max(ratedPower(state.diameter)*1.15, 1);
+
+    curveCtx.strokeStyle = 'rgba(126,150,148,0.25)';
+    curveCtx.fillStyle = '#7E9694';
+    curveCtx.font = '10px IBM Plex Mono';
+    curveCtx.lineWidth = 1;
+    [0,10,20].forEach(v=>{
+      const x = padL+(v/maxV)*plotW;
+      curveCtx.beginPath(); curveCtx.moveTo(x,padT); curveCtx.lineTo(x,padT+plotH); curveCtx.stroke();
+      curveCtx.fillText(v+'', x-4, h-8);
+    });
+    curveCtx.fillText('m/s', w-padR-20, h-8);
+
+    curveCtx.strokeStyle = getVar('--power');
+    curveCtx.lineWidth = 2;
+    curveCtx.beginPath();
+    for(let v=0; v<=maxV; v+=0.3){
+      const p = powerAt(v, state.diameter);
+      const x = padL+(v/maxV)*plotW;
+      const y = padT+plotH-(p/maxP)*plotH;
+      if(v===0) curveCtx.moveTo(x,y); else curveCtx.lineTo(x,y);
+    }
+    curveCtx.stroke();
+
+    const mx = padL+(currentV/maxV)*plotW;
+    const my = padT+plotH-(currentP/maxP)*plotH;
+    curveCtx.fillStyle = getVar('--wind');
+    curveCtx.beginPath();
+    curveCtx.arc(mx,my,4,0,Math.PI*2);
+    curveCtx.fill();
+  }
+
+  const chartCanvas = el('chart'), ctx = chartCanvas.getContext('2d');
+  function drawChart(){
+    const w = chartCanvas.width, h = chartCanvas.height;
+    ctx.clearRect(0,0,w,h);
+    const padL = 36, padR = 36, padT = 10, padB = 20;
+    const plotW = w-padL-padR, plotH = h-padT-padB;
+    if(state.history.length < 2) return;
+
+    const windowSec = 60;
+    const tMax = state.history[state.history.length-1].t;
+    const tMin = Math.max(0, tMax-windowSec);
+
+    ctx.strokeStyle = 'rgba(126,150,148,0.2)';
+    ctx.fillStyle = '#7E9694';
+    ctx.font = '10px IBM Plex Mono';
+    ctx.lineWidth = 1;
+    for(let i=0;i<=4;i++){
+      const x = padL+(i/4)*plotW;
+      ctx.beginPath(); ctx.moveTo(x,padT); ctx.lineTo(x,padT+plotH); ctx.stroke();
+    }
+    ctx.fillText('kW', 4, padT+10);
+    ctx.fillText('m/s', w-padR+4, padT+10);
+
+    const maxP = Math.max(ratedPower(state.diameter)*1.15, 1);
+    const maxW = 28;
+
+    function plot(key, color, scaleMax){
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      let started = false;
+      state.history.forEach(p=>{
+        if(p.t < tMin) return;
+        const x = padL + ((p.t-tMin)/windowSec)*plotW;
+        const y = padT + plotH - (p[key]/scaleMax)*plotH;
+        if(!started){ ctx.moveTo(x,y); started = true; } else ctx.lineTo(x,y);
+      });
+      ctx.stroke();
+    }
+    plot('wind', getVar('--wind'), maxW);
+    plot('power', getVar('--power'), maxP);
+  }
+
+  let lastTime = null;
+  function tick(ts){
+    if(lastTime===null) lastTime = ts;
+    const dtReal = Math.min((ts-lastTime)/1000, 0.25);
+    lastTime = ts;
+
+    if(state.running){
+      const dt = dtReal*state.timeScale;
+      state.t += dt;
+
+      const v = windAt(state.t, state.mean, state.turb);
+      const p = powerAt(v, state.diameter);
+      const rated = ratedPower(state.diameter);
+      state.energy += p*(dt/3600);
+
+      let statusText, statusColor;
+      if(v < CUT_IN){ statusText='Por debajo del arranque'; statusColor=getVar('--text-dim'); }
+      else if(v >= CUT_OUT){ statusText='Parada de seguridad'; statusColor=getVar('--danger'); }
+      else if(v >= RATED_V){ statusText='Potencia nominal'; statusColor=getVar('--ok'); }
+      else { statusText='Generando'; statusColor=getVar('--wind'); }
+      statusBox.innerHTML = statusText+'<span>estado de la turbina</span>';
+      statusBox.style.color = statusColor;
+
+      const spinning = (v>=CUT_IN && v<CUT_OUT);
+      const rpm = spinning ? Math.min(v,RATED_V)*3.4 : 0;
+      if(spinning) bladeAngle += dtReal*rpm*4;
+      blades.setAttribute('transform', 'translate(230,80) rotate('+bladeAngle+')');
+
+      windOffset -= dtReal*(20+v*8)*0.5;
+      windLines.forEach(l=>l.setAttribute('stroke-dashoffset', windOffset));
+      const windActive = v > 0.3;
+      windLines.forEach(l=> l.style.opacity = windActive ? Math.min(0.85, 0.3+v/28) : 0.1 );
+
+      lineOut._offset -= dtReal*(10+p*10)*0.5;
+      lineOut.setAttribute('stroke-dashoffset', lineOut._offset);
+      lineOut.style.opacity = p>0.05 ? Math.min(1,0.35+p/rated*0.65) : 0.12;
+
+      txtWindNode.textContent = v.toFixed(1)+' m/s';
+      txtRpmNode.textContent = Math.round(rpm)+' rpm';
+      txtPowerNode.textContent = p.toFixed(1)+' kW';
+
+      statWind.innerHTML = v.toFixed(1)+'<span class="unit">m/s</span>';
+      statPower.innerHTML = p.toFixed(1)+'<span class="unit">kW</span>';
+      statRated.innerHTML = rated.toFixed(1)+'<span class="unit">kW</span>';
+      statEnergy.innerHTML = state.energy.toFixed(2)+'<span class="unit">kWh</span>';
+
+      state.history.push({t:state.t, wind:v, power:p});
+      if(state.history.length > 1200) state.history.shift();
+
+      drawCurve(v,p);
+      drawChart();
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
